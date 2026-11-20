@@ -1,313 +1,118 @@
+# ⚡ PokéEngine — Reactive Backend API
+
+![Java](https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=openjdk)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-brightgreen?style=for-the-badge&logo=springboot)
+![Spring WebFlux](https://img.shields.io/badge/Spring_WebFlux-Reactive-6DB33F?style=for-the-badge&logo=spring)
+![PostgreSQL](https://img.shields.io/badge/R2DBC-PostgreSQL-336791?style=for-the-badge&logo=postgresql)
+![MongoDB](https://img.shields.io/badge/MongoDB-Reactive-47A248?style=for-the-badge&logo=mongodb)
+![Redis](https://img.shields.io/badge/Redis-Reactive-DC382D?style=for-the-badge&logo=redis)
 
+API RESTful construida con **Spring WebFlux** que simula el ecosistema completo de un entrenador Pokémon: captura probabilística basada en *catch rate* real, gestión de equipos, guardería con progresión temporal, tienda dinámica con rotación diaria, sistema de acertijos e intercambios en tiempo real entre entrenadores.
+
+---
+
+## ✨ Características Principales
+
+* **🎯 Motor de Captura Probabilística:** Cálculo dinámico en tiempo real basado en el *catch rate* oficial obtenido desde PokéAPI, multiplicadores de Pokéball y estado del Pokémon.
+* **🛡️ Gestión de Equipo y Mochila:** Administración reactiva del equipo activo (máximo 6 Pokémon), almacenamiento en PC, inventario de ítems y *wishlist*.
+* **🥚 Guardería con Progresión Temporal:** Sistema de crianza y ganancia de experiencia basada en marcas de tiempo (*timestamps*) sin bloquear hilos del servidor.
+* **🛒 Tienda Dinámica y Acertijos:** Rotación automática de inventario diario y retos diarios gestionados mediante expiración de claves (*TTL*) en caché.
+* **🔄 Intercambios en Tiempo Real:** Salas de intercambio efímeras entre entrenadores.
+* **🔐 Seguridad Reactiva:** Autenticación y autorización stateless mediante **Spring Security WebFlux + JWT**.
+
+---
+
+## 🏗️ Arquitectura y Persistencia Políglota
+
+El sistema está diseñado bajo el paradigma **Reactivo (Project Reactor)** utilizando *drivers* no bloqueantes de extremo a extremo  y una estrategia de **persistencia políglota** elegida según la naturaleza y patrón de acceso de cada dato:
+
+```mermaid
+graph TD
+    Client[Cliente / Postman] -->|HTTPS + JWT| Security[Spring WebFlux Security]
+    Security --> Controllers[Reactive Controllers / WebFlux]
+    
+    Controllers -->|R2DBC| SQL[(PostgreSQL<br/>Usuarios, Roles, Pokémon Capturados)]
+    Controllers -->|Reactive Mongo| Mongo[(MongoDB<br/>Equipos, Mochila, Wishlist)]
+    Controllers -->|Reactive Redis| Redis[(Redis<br/>Salas de Intercambio, Tienda Diaria, Acertijos)]
+    Controllers -->|WebClient| PokeAPI((PokéAPI Externa))
+```
+
+### ¿Por qué tres motores de base de datos?
+
+| Motor | Driver Reactivo | Responsabilidad | Justificación Técnica |
+| :--- | :--- | :--- | :--- |
+| **PostgreSQL** | `R2DBC` | Usuarios, credenciales, roles y registro histórico de Pokémon capturados. | Garantiza integridad referencial y transacciones ACID para la propiedad crítica de los Pokémon. |
+| **MongoDB** | `Reactive Mongo` | Composición de equipos, mochila de ítems y *wishlist*. | Estructuras JSON flexibles y anidadas que evitan *joins* costosos en lecturas frecuentes del perfil. |
+| **Redis** | `Lettuce (Reactive)` | Salas de intercambio, tienda diaria, acertijos y caché de PokéAPI. | Soporte para expirar tiendas diarias y salas inactivas automáticamente. |
+
+---
+
+## 🛠️ Stack Tecnológico
+
+* **Lenguaje & Framework:** Java 21, Spring Boot 3.x, Spring WebFlux (Project Reactor: `Mono` / `Flux`).
+* **Seguridad:** Spring Security Reactive, JSON Web Tokens (JJWT).
+* **Persistencia No Bloqueante:** Spring Data R2DBC, Spring Data Reactive MongoDB, Spring Data Reactive Redis.
+* **Cliente HTTP Reactivo:** `WebClient` con manejo de resiliencia.
+
+---
+
+## 🚀 Instalación y Ejecución Local
+
+### Prerrequisitos
+* **JDK 21** o superior
+* **Docker** y **Docker Compose** (para levantar PostgreSQL, MongoDB y Redis)
+* **Maven 3.9+**
+
+### 1. Clonar el repositorio
+```bash
+git clone https://github.com/pedroaldama/BackendAPI
+```
+
+### 2. Levantar la infraestructura con Docker
+```bash
+docker-compose up -d
+```
+
+### 3. Configurar variables de entorno
+Crea un archivo `.env` o exporta las siguientes variables antes de ejecutar la aplicación:
+
+```env
+DB_URL: 
+DB_USER: 
+DB_PASSWORD: 
+MONGO: 
+
+R2DBC_URL=r2dbc:postgresql://localhost:5432/pokeengine
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+
+MONGO_URI=mongodb://localhost:27017/pokeengine
+REDIS_HOST=localhost
+REDIS_PORT=6379
+POKEAPI_BASE_URL=https://pokeapi.co/api/v2
+```
+
+### 4. Ejecutar la aplicación
+```bash
+./mvnw spring-boot:run
+```
+Una vez iniciada, la documentación interactiva estará disponible en:
+👉 `http://localhost:8080/webjars/swagger-ui/index.html`
+
+---
 
-# BackendAPI
-Este proyecto es una práctica de desarrollo de microservicios que consume datos de la PokeAPI.
-Está construido utilizando Java y Maven, y tiene como objetivo mostrar mis habilidades consumiendo apis y utilizando sus datos
-para crear informacion y nuevas funciones
+## 📡 Principales Endpoints
 
-Características :
-Implementación de microservicios en Java.
+| Método | Endpoint | Descripción | Auth |
+| :--- | :--- | :--- | :---: |
+| `POST` | `/api/v1/auth/register` | Registro de nuevo entrenador. | ❌ |
+| `POST` | `/api/v1/auth/login` | Autenticación y generación de token JWT. | ❌ |
+| `POST` | `/api/v1/pokemon/catch/{pokemonId}` | Intento de captura usando una Pokéball específica. | ✅ |
+| `GET` | `/api/v1/trainer/team` | Obtiene el equipo activo y mochila del entrenador. | ✅ |
+| `POST` | `/api/v1/daycare/deposit` | Deposita un Pokémon en la guardería. | ✅ |
+| `GET` | `/api/v1/shop/daily` | Consulta los artículos disponibles en la tienda del día. | ✅ |
+| `POST` | `/api/v1/riddles/solve` | Envía la respuesta al acertijo activo para ganar recompensas. | ✅ |
+| `POST` | `/api/v1/trades/rooms` | Crea o se une a una sala de intercambio en tiempo real. | ✅ |
 
-Consumo de la PokeAPI para obtener información de Pokémon.
+---
 
-Estructura del proyecto basada en Maven.
-
-Diseño enfocado en la escalabilidad y mantenibilidad.
-
-Tecnologias:
--
-+ Java 21
-+ Maven
-+ MySQL
-+ Mongo
-+ Redis
-+ Lombock
-+ JWT
-+ Spring Security
-+ Docker
-+ WebClient
-
-## 📌 ¿Qué puedes hacer con esta app?
-
-- 🔐 Registrar e iniciar sesión como usuario.
-- 🔎 Consultar Pokémon por generación o tipo.
-- 🧩 Resolver acertijos de nombres mezclados.
-- 🎒 Gestionar una mochila con dinero e ítems.
-- 🛒 Comprar ítems evolutivos o consumibles.
-- 🧬 Capturar Pokémon y asignarles ítems.
-- 🧑‍🤝‍🧑 Crear equipos y agregar o intercambiar Pokémon.
-- ⭐ Crear y gestionar una lista de deseos (wishlist).
-- 🏡 Dejar Pokémon en la guardería (daycare).
-- 🔁 Intercambiar Pokémon con otros entrenadores.
-
-# 📦 BackendAPI Pokémon App
-
-Esta es la documentación del backend para la aplicación de gestión de Pokémon. La API permite registrar usuarios, iniciar sesión, consultar información de Pokémon, gestionar mochilas, resolver acertijos, comprar ítems, formar equipos, capturar Pokémon y mucho más.
-
-## 📂 Endpoints Públicos
-
-Estos endpoints no requieren autenticación.
-
-🔐 /auth
-
-🔑 /login
-Tipo: POST  
-  {
-    "username": "string",
-    "password": "string"
-  }
-  Descripción: Inicia sesión con credenciales válidas y retorna un token JWT para acceder a los endpoints privados.
-
-📝 /register
-Tipo: POST
-
-Body:
-{
-  "username": "string",
-  "password": "string",
-  "email": "string"
-}
-
-Descripción: Registra un nuevo usuario. Todos los campos son obligatorios. El correo debe ser válido. El nombre de usuario debe tener al menos 3 caracteres y la contraseña, al menos 6.
-
-🐾 /pokemon
-
-+ /
-Tipo: GET
-
-Params: generation
-
-Descripción: Retorna una lista con los nombres de los Pokémon de una generación específica. Ejemplo: ?generation=1 o ?generation=generation-I.
-
-### /types
-
-Tipo: GET
-
-Params: type
-
-Descripción: Retorna Pokémon que tienen ese tipo como primario o secundario.
-
-### /generation
-
-Tipo: GET
-
-Params: generation
-
-Descripción: Retorna un mapa con IDs y nombres de los Pokémon de esa generación.
-
-### /evolution
-Tipo: GET
-
-Params: String id
-
-Descripción: Informa el trigger de evolución del Pokémon (nivel, ítem, etc.) o indica si no tiene evolución.
-
-### /random
-Tipo: GET
-
-Descripción: Retorna el nombre de un Pokémon aleatorio entre las 9 generaciones.
-
-
-#  🔒 Endpoints Privados
-Requieren token JWT. Se obtiene en /auth/login.
-
-## 🎒 /bag
-### /
-Tipo: GET
-
-Descripción: Retorna un JSON con:
-
-+ money
-+ objetosEvolutivos
-+ objetosConsumibles
-
-### /money/check
-Tipo: GET
-
-Descripción: Consulta la cantidad actual de dinero.
-
-## ❓ /questions
-### /
-Tipo: GET
-
-Descripción: Retorna el nombre de un Pokémon con letras desordenadas. El acertijo se almacena en Redis.
-
-### /answer
-Tipo: POST
-
-Params: String answer
-
-Descripción: Valida la respuesta. Si es correcta, otorga 100 monedas y elimina el acertijo de Redis.
-
-### /answer/get
-Tipo: GET
-
-Descripción: Muestra la respuesta correcta al acertijo y la elimina de Redis.
-
-## 🛍️ /shop
-### /
-Tipo: GET
-
-Descripción: Muestra los ítems disponibles en la tienda con su precio.
-
-### /buy
-
-Tipo: POST
-
-Params: String type, String item
-
-Descripción: Compra un ítem si el usuario tiene suficiente dinero. Tipos válidos: Consumable, Evolution.
-
-## 👥 /team
-### /
-Tipo: GET
-
-Descripción: Retorna un DTO con el nombre del equipo, miembros y su información (exp, vida, id, entrenador original).
-
-### /
-Tipo: POST
-
-Params: String name
-
-Descripción: Crea un nuevo equipo. Si ya existe uno, lo informa.
-
-### /add
-Tipo: POST
-
-Params: long idPokemon
-
-Descripción: Agrega un Pokémon al equipo si está en estado PC.
-
-### /change
-Tipo: POST
-
-Params: long idPokemon, long idPokemonTeam
-
-Descripción: Intercambia un Pokémon del equipo por uno en estado PC.
-
-## 🎯 /wishlist
-### /
-Tipo: GET
-
-Descripción: Muestra los ítems en la wishlist del usuario.
-
-### /create
-Tipo: POST
-
-Descripción: Crea una nueva wishlist. Si ya existe, lo indica.
-
-### /verify
-Tipo: GET
-
-Params: String item
-
-Descripción: Verifica si el ítem está en la wishlist.
-
-### /add
-Tipo: POST
-
-Params: String item
-
-Descripción: Agrega un ítem a la wishlist. No permite duplicados ni ítems inválidos.
-
-### /delete
-
-Tipo: DELETE
-
-Params: String item
-
-Descripción: Elimina el ítem de la wishlist.
-
-## 👤 /user 
-
-## ⚠️ Notas importantes
-***El idPokemon solicitado corresponde al ID de asociación entre el Pokémon y el usuario, no al ID original del Pokémon.
-Este ID se genera al capturar un Pokémon o puede consultarse en los detalles del equipo.***
-
-
-![image](https://github.com/user-attachments/assets/8ba8588d-111f-4cec-9775-ee651650d7ff)
-
-![image](https://github.com/user-attachments/assets/0dce6e39-9c31-41d1-ad9c-554053ea0192)
-
-![image](https://github.com/user-attachments/assets/f1ee5645-3ac7-414e-ba99-1a4916770040)
-
-
-### /
-
-Tipo: GET
-
-Descripción: Muestra todos los Pokémon del usuario.
-
-### /status
-Tipo: GET
-
-Params: String status
-
-Descripción: Muestra los Pokémon con ese estado (PC, Team, DC, Swap).
-
-### /pokemon
-Tipo: GET
-
-Params: int id
-
-Descripción: Retorna los detalles del Pokémon con ID de asociación al usuario.
-
-### /caught
-Tipo: POST
-
-Params: string pokemon
-
-Descripción: Intenta capturar el Pokémon. Si tiene éxito, se asocia al usuario.
-
-### /item/add
-Tipo: POST
-
-Params: String item, int pokemonId
-
-Descripción: Usa un ítem en un Pokémon. Si es medicinal, recupera vida. Si es equipable, reemplaza el anterior.
-
-### /item/remove
-
-Tipo: PATCH
-
-Params:int pokemonId
-
-Descripción: Quita el ítem del Pokémon, si tiene uno.
-
-### /pokemon/change/name
-Tipo: PATCH
-
-Params: int pokemonId, String name
-
-Descripción: Cambia el nombre del Pokémon.
-
-### 🔁 Intercambio
-### /swap
-
-Tipo: POST
-
-Params: long idPokemon
-
-Descripción: Crea una sala de intercambio. El Pokémon cambia su estado a Swap.
-
-### /swap/other
-Tipo: POST
-
-Params: long idPokemon, string trainer
-
-Descripción: Se intercambia un Pokémon con otro entrenador. Ambos terminan en estado PC.
-
-### 🏡 Guardería
-### /daycare
-Tipo: POST
-
-Params: long idPokemon
-
-Descripción: Envía un Pokémon a la guardería. Si ya hay uno, lo informa.
-
-### /daycare/collect
-Tipo: GET
-
-Params: long idPokemon
-
-Descripción: Recupera al Pokémon, calcula el tiempo y experiencia ganada. Si cumple condiciones de evolución, evoluciona.
