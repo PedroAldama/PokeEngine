@@ -65,7 +65,7 @@ graph TD
 
 ### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/pedroaldama/BackendAPI
+git clone https://github.com/pedroaldama/PokeEngine
 ```
 
 ### 2. Levantar la infraestructura con Docker
